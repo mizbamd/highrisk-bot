@@ -524,6 +524,10 @@ class ExchangeHoursConfig(BaseModel, DisplayMixin):
     delay_after_open: int = Field(default=1800, ge=0)
     delay_before_close: int = Field(default=1800, ge=0)
     max_wait_until_open: int = Field(default=3600, ge=0)
+    enable_extended_hours: bool = Field(default=False, description="Enable extended hours trading (premarket/afterhours)")
+    enable_premarket_scanner: bool = Field(default=False, description="Enable premarket scanning (4:00 AM - 9:30 AM ET)")
+    premarket_scan_start_hour: int = Field(default=4, ge=0, le=23, description="Premarket scan start hour (ET)")
+    premarket_scan_start_minute: int = Field(default=0, ge=0, le=59, description="Premarket scan start minute (ET)")
 
     def add_to_table(self, table: Table, section: str = "") -> None:
         table.add_row("[spring_green1]Exchange hours")
@@ -532,6 +536,8 @@ class ExchangeHoursConfig(BaseModel, DisplayMixin):
         table.add_row("", "Delay after open", "=", f"{self.delay_after_open}s")
         table.add_row("", "Delay before close", "=", f"{self.delay_before_close}s")
         table.add_row("", "Max wait until open", "=", f"{self.max_wait_until_open}s")
+        table.add_row("", "Extended hours", "=", f"{self.enable_extended_hours}")
+        table.add_row("", "Premarket scanner", "=", f"{self.enable_premarket_scanner}")
 
 
 class Config(BaseModel, DisplayMixin):

@@ -17,6 +17,26 @@ def determine_action(config: ExchangeHoursConfig, now: datetime) -> str:
     calendar = xcals.get_calendar(config.exchange)
     today = now.date()
 
+    # Check if extended hours are enabled for premarket scanning
+    if config.enable_extended_hours or config.enable_premarket_scanner:
+        # Check if we're in premarket hours (4:00 AM - 9:30 AM ET)
+        # For now, allow premarket scanning even if market is "closed"
+        try:
+            # Use pandas timezone handling (already a dependency)
+            now_et = pd.Timestamp(now).tz_convert("America/New_York").to_pydatetime()
+            premarket_start = now_et.replace(hour=4, minute=0, second=0, microsecond=0)
+            
+            if calendar.is_session(today):  # type: ignore
+                regular_open = calendar.session_open(today)  # type: ignore
+                regular_open_et = regular_open.astimezone(now_et.tzinfo)
+                
+                # Allow premarket scanning (4:00 AM - 9:30 AM ET)
+                if premarket_start <= now_et < regular_open_et and config.enable_premarket_scanner:
+                    log.info("Premarket hours - scanning enabled")
+                    return "continue"
+        except Exception as e:
+            log.warning(f"Error checking extended hours: {e}")
+
     if calendar.is_session(today):  # type: ignore
         open = calendar.session_open(today)  # type: ignore
         close = calendar.session_close(today)  # type: ignore
@@ -31,6 +51,8 @@ def determine_action(config: ExchangeHoursConfig, now: datetime) -> str:
         table.add_row("Close", str(close))
         table.add_row("Start", str(start))
         table.add_row("End", str(end))
+        if config.enable_premarket_scanner:
+            table.add_row("Premarket Scanner", "Enabled")
         log.print(table)
 
         if start <= now <= end:

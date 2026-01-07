@@ -622,3 +622,16 @@ delay_after_open = 0
 # ThetaGang. For example, if set to 1800, ThetaGang will consider the market
 # closed 30 minutes prior to the actual close.
 delay_before_close = 0
+
+# Enable extended hours trading (premarket 4:00 AM - 9:30 AM ET and afterhours)
+# Note: Extended hours trading has lower liquidity and wider spreads
+enable_extended_hours = false
+
+# Enable premarket scanner (scans opportunities 4:00 AM - 9:30 AM ET)
+# The scanner identifies opportunities but trades are executed during regular hours
+enable_premarket_scanner = true
+
+# Premarket scan start time (ET timezone)
+# Default: 4:00 AM ET
+premarket_scan_start_hour = 4
+premarket_scan_start_minute = 0

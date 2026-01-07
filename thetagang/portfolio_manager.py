@@ -52,6 +52,7 @@ from thetagang.util import (
 
 from .market_regime import MarketRegimeDetector
 from .options import option_dte
+from .premarket_scanner import PremarketScanner
 
 # Turn off some of the more annoying logging output from ib_async
 logging.getLogger("ib_async.ib").setLevel(logging.ERROR)
@@ -96,6 +97,7 @@ class PortfolioManager:
         self.qualified_contracts: Dict[int, Contract] = {}
         self.dry_run = dry_run
         self.regime_detector: MarketRegimeDetector = MarketRegimeDetector(self.ibkr, ib)
+        self.premarket_scanner: PremarketScanner = PremarketScanner(self.config, self.ibkr)
 
     def get_short_calls(
         self, portfolio_positions: Dict[str, List[PortfolioItem]]
@@ -649,6 +651,24 @@ class PortfolioManager:
     async def manage(self) -> None:
         try:
             self.initialize_account()
+            
+            # Run premarket scanner if enabled and in premarket hours
+            if self.config.exchange_hours.enable_premarket_scanner:
+                if self.premarket_scanner.is_premarket_hours():
+                    log.info("Running premarket scanner...")
+                    await self.premarket_scanner.scan_all_symbols()
+                    summary_table = self.premarket_scanner.get_opportunities_summary()
+                    log.print(summary_table)
+                    
+                    # Get top opportunities for logging
+                    top_ops = await self.premarket_scanner.get_top_opportunities(limit=5)
+                    if top_ops:
+                        log.info(f"Found {len(top_ops)} premarket opportunities")
+                        for op in top_ops:
+                            log.info(
+                                f"  {op['symbol']}: {op['price_change_pct']:+.2f}% "
+                                f"→ {op['recommended_action']}"
+                            )
             
             # Detect market regime
             regime_metrics = await self.regime_detector.detect_regime()
