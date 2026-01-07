@@ -8,7 +8,7 @@
 # account before trying on a live account.
 [account]
 # The account number to operate on
-number = "DU1234567"
+number = "DUO840569"
 
 # Cancel any existing orders for the symbols configured at startup
 cancel_orders = true
@@ -100,15 +100,16 @@ minimum_credit = 0.05
 # If you have issues where thetagang can't find suitable contracts, try
 # increasing these values slightly.
 #
+# Scaled for 200 tickers: increased expirations and strikes for better coverage
 # Number of expirations to load from option chains
-expirations = 4
+expirations = 6
 
 # Number of strikes to load from option chains
-strikes = 15
+strikes = 20
 
 [roll_when]
-# Roll when P&L reaches 90%
-pnl = 0.9
+# Roll when P&L reaches 50% (automated profit-taking)
+pnl = 0.5
 # Or, roll options when there are <= 15 days to expiry and P&L is at least
 # min_pnl (min_pnl defaults to 0)
 #
@@ -344,217 +345,92 @@ minimum_open_interest = 10
 #  [target.calls]
 #  delta = 0.3
 [symbols]
-  # NOTE: Please change these symbols and weights according to your preferences.
-  # These are provided only as an example for the purpose of configuration. These
-  # values were chosen as sane values should someone decide to run this code
-  # without changes, however it is in no way a recommendation or endorsement.
-  #
-  # You can specify the weight either as a percentage of your buying power (which
-  # is calculated as your NLV * account.margin_usage), or in terms of parts. Parts
-  # are summed from all symbols, then the weight is calculated by dividing the
-  # parts by the total parts.
-  #
-  # You should try to choose ETFs or stocks that:
-  #
-  #  1) Have sufficient trading volume for the underlying
-  #  2) Have standard options contracts (100 shares per contract)
-  #  3) Have options with sufficient open interest and trading volume
-  #
-  # The target delta may also be specified per-symbol, and takes precedence over
-  # `target.delta` or `target.puts/calls.delta`. You can specify a value for the
-  # symbol, or override individually for puts/calls.
-  #
-  # Additionally, you can enable buy-only rebalancing for any symbol by setting
-  # `buy_only_rebalancing = true`. This will cause the bot to buy shares directly
-  # instead of writing puts, which is useful for maintaining core positions in
-  # certain assets. See the TLT example below for more details.
-  [symbols.SPY]
-  weight = 0.4
+  # 20 tickers configured with equal weights (0.050000 each)
+  # Total weight = 1.0
+  # Parameters: 45 DTE, 30 delta, 50% profit target
 
-  # OR: specify in terms of parts. Must use either weight or parts, but cannot mix
-  # both.
-  # parts = 40
-
-  # Sometimes, particularly for stocks/ETFs with limited liquidity, the spreads
-  # are too wide to get an order filled at the midpoint on the first attempt. For
-  # those, you can try setting this to `true`, and thetagang will wait a random
-  # amount of time, then resubmit orders that haven't filled (but only for the
-  # symbols with this set to true). The amount of time we'll wait is chosen
-  # randomly from the range defined by `orders.price_update_delay`.
-  adjust_price_after_delay = false
-
-  # You can include a symbol, but instruct ThetaGang not to place any trades for
-  # that symbol by setting `no_trading = true`. This allows you to include
-  # placeholders (such as for tracking purposes, or because you want to trade
-  # manually) without actually trading them.
-  #
-  # no_trading = true
-
-  [symbols.QQQ]
-  weight = 0.3
-  # The target DTE may also be specified per-symbol, and takes precedence over
-  # `target.dte`
-  dte = 60
-  # Optional: specify the maximum contract DTE for this symbol (i.e., don't open
-  # or roll positions past this DTE). This will override the `target.max_dte`
-  # value.
-  # max_dte = 45
-
-  # Optional: If we try to roll the position and it fails, just close it (but
-  # only if it's profitable).
-  close_if_unable_to_roll = true
-
-    # parts = 30
-    [symbols.QQQ.puts]
-    # Override delta just for QQQ puts
-    delta = 0.5
-    # Also, optionally specify a strike limit, for either puts or calls.
-    # Interpreted as an upper bound for puts, and a lower bound for calls.
-    strike_limit = 1000.0 # never write a put with a strike above $1000
-
-    # Optionally, if we only write new contracts when the underlying is green or
-    # red (`write_when.*.green=true` && `write_when.*.red=false` or vice versa),
-    # specify a minimum threshold as an absolute value daily percentage change
-    # (in this example, use 1% for puts only, but could also be specified as
-    # `symbols.QQQ.write_threshold`). This can also be specified under
-    # `constants.write_threshold` and `constants.puts/calls.write_threshold` to
-    # apply to all symbols, either for both puts or calls, or individually.
-    #
-    # In this example, we'd only write puts on QQQ when the daily change is -1% or
-    # greater (provided that we also set `write_when.puts.red=true`).
-    write_threshold = 0.01 # 1%, absolute value
-
-    # Alternatively, you can express write threshold value in terms of sigma with
-    # `write_threshold_sigma`. A value of 2.0 means that we'll write new contracts
-    # when the daily change is twice the standard deviation of the log returns.
-    #
-    # If write_threshold_sigma is specified, it supersedes (overrides) the value of
-    # write_threshold.
-    #
-    # The daily standard deviation of log returns is calculated based on the past
-    # 30 days of data by default, but you can adjust this by altering the value of
-    # `constants.daily_stddev_window`.
-    #
-    # Note that we'll need to retrieve this historical data for every execution to
-    # calculate this value, so you should be sure there's 1) sufficient history
-    # available and 2) the data can be retrieved sufficiently fast.
-    #
-    # write_threshold_sigma = 1.0 # 1x the standard devation of log returns for the daily stddev window
-
-      # the values for `write_when.*.green` and `write_when.*.red` can also be set per-symbol
-      [symbols.QQQ.puts.write_when]
-      green = false
-      red   = true
-
-    [symbols.QQQ.calls]
-    strike_limit = 100.0 # never write a call with a strike below $100
-
-    maintain_high_water_mark = true # maintain the high water mark when rolling calls
-
-    # These values can (optionally) be set on a per-symbol basis, in addition to
-    # `write_when.calls.cap_factor` and `write_when.calls.cap_target_floor.
-    cap_factor       = 1.0
-    cap_target_floor = 0.0
-
-    # Optionally, only write calls when the underlying has an excess of shares
-    # when set to `true`. This overrides the `write_when.calls.excess_only`
-    # value.
-    excess_only = false
-
-# Sell-only rebalancing example:
-# This symbol demonstrates sell-only rebalancing, which is useful for gradually
-# reducing positions when they exceed target allocation.
-#
-# [symbols.TSLA]
-# weight = 0.1
-# sell_only_rebalancing = true
-# sell_only_min_threshold_shares = 5  # Only sell if selling at least 5 shares
-# sell_only_min_threshold_percent_relative = 0.2  # Only sell if >20% above target
-#
-# When TSLA grows to more than 12% of portfolio (20% above 10% target), the bot
-# will sell shares to bring it back to 10%. No puts are written, and no calls
-# are written on this position.
-
-# Band rebalancing example (both buy and sell):
-# This creates a rebalancing "band" around the target allocation.
-#
-# [symbols.BTC]
-# weight = 0.05
-# buy_only_rebalancing = true
-# sell_only_rebalancing = true
-# buy_only_min_threshold_percent_relative = 0.15   # Buy when >15% below target
-# sell_only_min_threshold_percent_relative = 0.15  # Sell when >15% above target
-#
-# This keeps BTC between 4.25% and 5.75% of the portfolio (±15% of 5% target).
-# No options are written on this position.
-
-  [symbols.TLT]
-  weight = 0.2
-  # parts = 20
-  # Override delta for this particular symbol, for both puts and calls.
-  delta = 0.4
-
-  # Buy-only rebalancing: this will buy shares directly instead of writing puts
-  # to build the position. This is useful for symbols where you want to maintain
-  # a core position without the complexity of options.
-  #
-  # When buy_only_rebalancing = true:
-  # - The bot will never write puts for this symbol
-  # - It will buy shares directly when below target allocation
-  # - It will only buy (never sell) to maintain target weight
-  # - You can still write covered calls on the shares you own
-  # - The position is built through direct stock purchases instead of CSPs
-  #
-  # Minimum thresholds (optional):
-  # - buy_only_min_threshold_shares: Minimum number of shares to buy (default: 1)
-  # - buy_only_min_threshold_amount: Minimum dollar amount for a purchase
-  # - buy_only_min_threshold_percent: Minimum as percentage of net liquidation value (absolute)
-  # - buy_only_min_threshold_percent_relative: Minimum as percentage difference from target allocation
-  #   * Priority: relative percent > absolute percent > dollar amount > share count
-  #   * If min amount < 1 share price, it rounds up to 1 share
-  #
-  # Examples:
-  # buy_only_rebalancing = true
-  # buy_only_min_threshold_shares = 10  # Only buy if buying at least 10 shares
-  # buy_only_min_threshold_amount = 1000.0  # Only buy if order is at least $1000
-  # buy_only_min_threshold_percent = 0.01  # Only buy if order is at least 1% of NLV
-  # buy_only_min_threshold_percent_relative = 0.1  # Only buy if position is >10% below target
-  #
-  # Relative threshold example:
-  # If TLT is allocated 50% but currently only 25% of NLV:
-  # - Relative difference = (50% - 25%) / 50% = 50%
-  # - If threshold = 0.1 (10%), then 50% > 10%, so buy is allowed
-  #
-  # Call writing thresholds (similar to buy thresholds but for limiting call writes):
-  # - write_calls_only_min_threshold_percent: Only write calls if position is at least X% of NLV
-  # - write_calls_only_min_threshold_percent_relative: Only write calls if position exceeds target by X%
-  #
-  # Examples:
-  # write_calls_only_min_threshold_percent = 0.05  # Only write calls if position is at least 5% of NLV
-  # write_calls_only_min_threshold_percent_relative = 0.2  # Only write calls if position exceeds target by 20%
-  #
-  # Relative threshold example for calls:
-  # If SPY is allocated 20% but currently 30% of NLV:
-  # - Relative excess = (30% - 20%) / 20% = 50%
-  # - If threshold = 0.2 (20%), then 50% > 20%, so call writing is allowed
-
-  [symbols.ABNB]
-  # For symbols that require an exchange, which is typically any company stock,
-  # you must specify the primary exchange.
-  primary_exchange = "NASDAQ"
-  weight           = 0.05
-
-  # parts = 5
-  # Sometimes you may need to wrap the symbol in quotes.
-  [symbols."BRK B"]
-  # For symbols that require an exchange, which is typically any company stock,
-  # you must specify the primary exchange.
+  [symbols.WMT]
+  weight = 0.050000
   primary_exchange = "NYSE"
-  weight           = 0.05
 
-# parts = 5
+  [symbols.QBTS]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.QUBT]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.CRML]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.MP]
+  weight = 0.050000
+  primary_exchange = "NYSE"
+
+  [symbols.OPEN]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.CVNA]
+  weight = 0.050000
+  primary_exchange = "NYSE"
+
+  [symbols.ALB]
+  weight = 0.050000
+  primary_exchange = "NYSE"
+
+  [symbols.NFLX]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.AMZN]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.TSLA]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.TMC]
+  weight = 0.050000
+  primary_exchange = "NYSE"
+
+  [symbols.NAK]
+  weight = 0.050000
+  primary_exchange = "NYSE"
+
+  [symbols.VOYG]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.QS]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.RGTI]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.UPST]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.EGO]
+  weight = 0.050000
+  primary_exchange = "NYSE"
+
+  [symbols.SHOP]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
+  [symbols.COIN]
+  weight = 0.050000
+  primary_exchange = "NASDAQ"
+
 [ib_async]
-logfile = '/etc/thetagang/ib_async.log'
+logfile = './ib_async.log'
 
 # Typically the amount of time needed when waiting on data from the IBKR API.
 # Sometimes it can take a while to retrieve data, and it's lazy-loaded by the
@@ -729,7 +605,7 @@ exchange = "XNYS"
 # and "continue" to continue.
 #
 # Setting this to "continue" is equivalent to disabling this feature.
-action_when_closed = "exit"
+action_when_closed = "wait"
 
 # The maximum amount of time, in seconds, to wait for the market to open if you
 # set `exchange_hours.action_when_closed = "wait"`. For example, a value of 3600
@@ -740,9 +616,9 @@ max_wait_until_open = 3600
 # The amount of time, in seconds, after the market open, to wait before running
 # ThetaGang. For example, if this is set to 1800, ThetaGang will consider the
 # market closed until 30 minutes after the open.
-delay_after_open = 1800
+delay_after_open = 0
 
 # The amount of time, in seconds, before the market close, to stop running
 # ThetaGang. For example, if set to 1800, ThetaGang will consider the market
 # closed 30 minutes prior to the actual close.
-delay_before_close = 1800
+delay_before_close = 0

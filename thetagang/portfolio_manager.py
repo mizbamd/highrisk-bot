@@ -50,6 +50,7 @@ from thetagang.util import (
     would_increase_spread,
 )
 
+from .market_regime import MarketRegimeDetector
 from .options import option_dte
 
 # Turn off some of the more annoying logging output from ib_async
@@ -94,6 +95,7 @@ class PortfolioManager:
         self.target_quantities: Dict[str, int] = {}
         self.qualified_contracts: Dict[int, Contract] = {}
         self.dry_run = dry_run
+        self.regime_detector: MarketRegimeDetector = MarketRegimeDetector(self.ibkr, ib)
 
     def get_short_calls(
         self, portfolio_positions: Dict[str, List[PortfolioItem]]
@@ -647,6 +649,17 @@ class PortfolioManager:
     async def manage(self) -> None:
         try:
             self.initialize_account()
+            
+            # Detect market regime
+            regime_metrics = await self.regime_detector.detect_regime()
+            
+            # Check if we should trade based on regime
+            if not self.regime_detector.should_trade():
+                log.warning(
+                    f"Trading paused due to market regime: {regime_metrics.regime.value}"
+                )
+                return
+            
             (account_summary, portfolio_positions) = await self.summarize_account()
 
             # Check if we have enough buying power to write some puts
