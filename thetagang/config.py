@@ -540,6 +540,21 @@ class ExchangeHoursConfig(BaseModel, DisplayMixin):
         table.add_row("", "Premarket scanner", "=", f"{self.enable_premarket_scanner}")
 
 
+class HighRiskConfig(BaseModel, DisplayMixin):
+    """Configuration for high-risk naked options trading around earnings"""
+    enable_earnings_expiry: bool = Field(default=False, description="Enable earnings-based expiry selection")
+    days_before_earnings: int = Field(default=10, ge=1, le=30, description="Days before earnings to open positions")
+    close_before_earnings: bool = Field(default=False, description="Close all positions 1 day before earnings")
+    max_position_per_symbol: float = Field(default=0.15, ge=0.0, le=1.0, description="Max position size per symbol (% of buying power)")
+
+    def add_to_table(self, table: Table, section: str = "") -> None:
+        table.add_row("[spring_green1]High Risk Trading")
+        table.add_row("", "Earnings expiry", "=", f"{self.enable_earnings_expiry}")
+        table.add_row("", "Days before ER", "=", f"{self.days_before_earnings}")
+        table.add_row("", "Close before ER", "=", f"{self.close_before_earnings}")
+        table.add_row("", "Max per symbol", "=", f"{self.max_position_per_symbol*100:.1f}%")
+
+
 class Config(BaseModel, DisplayMixin):
     account: AccountConfig
     option_chains: OptionChainsConfig
@@ -556,6 +571,7 @@ class Config(BaseModel, DisplayMixin):
     write_when: WriteWhenConfig = Field(default_factory=WriteWhenConfig)
     symbols: Dict[str, SymbolConfig] = Field(default_factory=dict)
     constants: ConstantsConfig = Field(default_factory=ConstantsConfig)
+    high_risk: HighRiskConfig = Field(default_factory=HighRiskConfig)
 
     def trading_is_allowed(self, symbol: str) -> bool:
         symbol_config = self.symbols.get(symbol)

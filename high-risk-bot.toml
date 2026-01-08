@@ -1,0 +1,162 @@
+# High-Risk Naked Options Trading Bot Configuration
+# 
+# Strategy: Trade naked calls and naked puts around earnings reports
+# - 45 DTE target
+# - Same-week expiry on earnings weeks
+# - Small portfolio, high risk/reward
+#
+# ⚠️ WARNING: Naked options have unlimited risk. Use with extreme caution.
+
+[account]
+# The account number to operate on
+number = "DUO840569"
+
+# Cancel any existing orders for the symbols configured at startup
+cancel_orders = true
+
+# HIGH RISK: Use more margin for naked options
+# Naked options require less capital than covered positions
+# Set to 2.0-4.0 for aggressive naked options trading
+margin_usage = 3.0
+
+# Market data type
+market_data_type = 1
+
+[constants]
+daily_stddev_window = "30 D"
+
+[orders]
+exchange = "SMART"
+price_update_delay = [30, 60]
+minimum_credit = 0.05
+
+  [orders.algo]
+  strategy = "Adaptive"
+  params = [
+    [
+      "adaptivePriority",
+      "Patient",
+    ],
+  ]
+
+[option_chains]
+# For earnings plays, we need more strikes to find the right expiry
+expirations = 8
+strikes = 25
+
+[roll_when]
+# Take profit quickly on earnings plays (volatility crush after ER)
+pnl = 0.3  # 30% profit target (more aggressive than wheel strategy)
+dte = 5    # Roll at 5 DTE (closer to earnings)
+min_pnl = 0.0
+
+  [roll_when.calls]
+  itm = true
+  always_when_itm = false
+  credit_only = false
+  has_excess = true
+
+  [roll_when.puts]
+  itm = false  # Don't roll ITM puts (let them expire or get assigned)
+  always_when_itm = false
+  credit_only = false
+  has_excess = true
+
+[write_when]
+# For naked options, we don't calculate net contracts
+# We want pure directional plays
+calculate_net_contracts = false
+
+  [write_when.calls]
+  # Write naked calls when stock is green (momentum play)
+  green = true
+  red = false
+  # No cap factor for naked calls (we don't own stock)
+  cap_factor = 1.0
+  cap_target_floor = 0.0
+  excess_only = false
+
+  [write_when.puts]
+  # Write naked puts when stock is red (support play)
+  green = false
+  red = true
+
+[target]
+# Target 45 DTE (but will override for earnings week)
+dte = 45
+max_dte = 60  # Don't go too far out
+delta = 0.3   # 30 delta for naked options
+
+# For high-risk bot, allow more contracts per trade
+maximum_new_contracts_percent = 0.10  # 10% of buying power per trade
+
+minimum_open_interest = 50  # Higher OI for earnings plays (more liquidity)
+
+# High-risk bot specific settings
+[high_risk]
+# Enable earnings-based expiry selection
+enable_earnings_expiry = true
+
+# Days before earnings to open positions
+# Open positions 1-2 weeks before earnings to capture IV expansion
+days_before_earnings = 10
+
+# Close positions before earnings (to avoid IV crush)
+# Set to true to close all positions 1 day before earnings
+close_before_earnings = false
+
+# Maximum position size per symbol (as % of buying power)
+max_position_per_symbol = 0.15  # 15% max per symbol
+
+# Small portfolio: Only trade 5-10 symbols
+[symbols]
+  # Example: High-volatility stocks with frequent earnings
+  # Replace with your chosen symbols
+  
+  [symbols.TSLA]
+  weight = 0.20
+  primary_exchange = "NASDAQ"
+  # Override DTE for earnings week (will be set by earnings detector)
+  
+  [symbols.NVDA]
+  weight = 0.20
+  primary_exchange = "NASDAQ"
+  
+  [symbols.AMD]
+  weight = 0.15
+  primary_exchange = "NASDAQ"
+  
+  [symbols.AAPL]
+  weight = 0.15
+  primary_exchange = "NASDAQ"
+  
+  [symbols.MSFT]
+  weight = 0.15
+  primary_exchange = "NASDAQ"
+  
+  [symbols.AMZN]
+  weight = 0.15
+  primary_exchange = "NASDAQ"
+
+[close_when]
+# Close at 100% profit (rare but possible with earnings volatility)
+pnl = 1.0
+close_if_unable_to_roll = true
+
+[exchange_hours]
+exchange = "XNYS"
+action_when_closed = "wait"
+max_wait_until_open = 3600
+delay_after_open = 0
+delay_before_close = 0
+enable_extended_hours = false
+enable_premarket_scanner = false
+
+[ib_async]
+logfile = './ib_async.log'
+api_response_wait_time = 60
+
+[ibc]
+# IBC configuration for IB Gateway
+# Configure your IBC settings here
+

@@ -53,6 +53,7 @@ from thetagang.util import (
 from .market_regime import MarketRegimeDetector
 from .options import option_dte
 from .premarket_scanner import PremarketScanner
+from .earnings_detector import EarningsDetector
 
 # Turn off some of the more annoying logging output from ib_async
 logging.getLogger("ib_async.ib").setLevel(logging.ERROR)
@@ -98,6 +99,7 @@ class PortfolioManager:
         self.dry_run = dry_run
         self.regime_detector: MarketRegimeDetector = MarketRegimeDetector(self.ibkr, ib)
         self.premarket_scanner: PremarketScanner = PremarketScanner(self.config, self.ibkr)
+        self.earnings_detector: EarningsDetector = EarningsDetector(self.config, self.ibkr)
 
     def get_short_calls(
         self, portfolio_positions: Dict[str, List[PortfolioItem]]
@@ -2329,6 +2331,16 @@ class PortfolioManager:
         contract_max_dte = self.config.get_max_dte_for(
             underlying.symbol,
         )
+        
+        # High-risk bot: Use earnings-based expiry if enabled
+        earnings_expiry: Optional[str] = None
+        if self.config.high_risk.enable_earnings_expiry:
+            earnings_expiry = await self.earnings_detector.get_earnings_expiry_for_symbol(underlying.symbol)
+            if earnings_expiry:
+                log.info(
+                    f"{underlying.symbol}: Using earnings-based expiry {earnings_expiry} "
+                    f"(same-week expiry for earnings)"
+                )
 
         log.notice(
             f"{underlying.symbol}: Searching option chain for "
@@ -2374,13 +2386,38 @@ class PortfolioManager:
             option_dte(exclude_expirations_before) if exclude_expirations_before else 0
         )
         strikes = sorted(strike for strike in chain.strikes if valid_strike(strike))
-        expirations = sorted(
-            exp
-            for exp in chain.expirations
-            if option_dte(exp) >= contract_target_dte
-            and option_dte(exp) >= min_dte
-            and (not contract_max_dte or option_dte(exp) <= contract_max_dte)
-        )[:chain_expirations]
+        
+        # High-risk bot: Filter for earnings expiry if specified
+        if earnings_expiry:
+            # Find expiration matching the earnings week
+            expirations = [
+                exp for exp in chain.expirations
+                if exp == earnings_expiry or exp.startswith(earnings_expiry[:6])  # Match YYYYMM
+            ]
+            if not expirations:
+                log.warning(
+                    f"{underlying.symbol}: Earnings expiry {earnings_expiry} not found in chain, "
+                    f"falling back to standard DTE selection"
+                )
+                # Fall back to standard selection
+                expirations = sorted(
+                    exp
+                    for exp in chain.expirations
+                    if option_dte(exp) >= contract_target_dte
+                    and option_dte(exp) >= min_dte
+                    and (not contract_max_dte or option_dte(exp) <= contract_max_dte)
+                )[:chain_expirations]
+            else:
+                log.info(f"{underlying.symbol}: Found {len(expirations)} expirations matching earnings week")
+        else:
+            # Standard DTE-based selection
+            expirations = sorted(
+                exp
+                for exp in chain.expirations
+                if option_dte(exp) >= contract_target_dte
+                and option_dte(exp) >= min_dte
+                and (not contract_max_dte or option_dte(exp) <= contract_max_dte)
+            )[:chain_expirations]
         if len(expirations) < 1:
             raise NoValidContractsError(
                 f"No valid contract expirations found for {underlying.symbol}. Continuing anyway...",
