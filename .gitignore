@@ -152,3 +152,4 @@ cython_debug/
 
 # Ignore notebooks
 *.ipynb
+data/*.jar
