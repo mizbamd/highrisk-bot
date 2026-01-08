@@ -153,3 +153,7 @@ cython_debug/
 # Ignore notebooks
 *.ipynb
 data/*.jar
+*.log
+ib_async.log
+*.pyc
+__pycache__/
